@@ -10,13 +10,19 @@ body {
   font-family: 'Segoe UI', Arial;
   margin: 0;
   background: #f4f6fa;
+}
+
+/* MAIN CONTAINER */
+.container {
+  max-width: 1200px;
+  margin: auto;
   padding: 20px;
 }
 
 /* HEADER */
 .header {
   background: linear-gradient(135deg, #1e3c72, #2a5298);
-  padding: 25px 20px;
+  padding: 25px;
   border-radius: 12px;
   margin-bottom: 25px;
   color: white;
@@ -36,10 +42,10 @@ body {
   opacity: 0.9;
 }
 
-/* KPI GRID */
+/* KPI GRID FIXED */
 .kpi-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: 1fr 1fr;
   gap: 15px;
   margin-bottom: 15px;
 }
@@ -54,7 +60,8 @@ body {
 
 .kpi-card h4 {
   margin: 0;
-  color: #555;
+  color: #666;
+  font-size: 15px;
 }
 
 .kpi-card span {
@@ -68,12 +75,12 @@ body {
 .problem-card {
   background: linear-gradient(135deg, #ff6b6b, #ff4d4d);
   color: white;
-  padding: 20px;
+  padding: 18px;
   border-radius: 12px;
   text-align: center;
-  font-size: 22px;
+  font-size: 20px;
   font-weight: bold;
-  margin-bottom: 20px;
+  margin-bottom: 25px;
   box-shadow: 0 4px 12px rgba(0,0,0,0.15);
 }
 
@@ -82,7 +89,7 @@ body {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-  margin-bottom: 20px;
+  margin-bottom: 25px;
 }
 
 select {
@@ -98,7 +105,7 @@ select {
   padding: 15px;
   border-radius: 12px;
   box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-  margin-bottom: 20px;
+  margin-bottom: 25px;
 }
 
 /* Table */
@@ -129,12 +136,13 @@ th {
 
 <body>
 
+<div class="container">
+
 <div class="header">
   <h1>Sellout vs Display Dashboard</h1>
   <p>Dealer Performance & Stock Health Monitor</p>
 </div>
 
-<!-- KPI SECTION -->
 <div class="kpi-grid">
   <div class="kpi-card">
     <h4>Total Sellout</h4>
@@ -158,7 +166,6 @@ th {
   🚨 Problem Cases: <span id="problemCount">0</span>
 </div>
 
-<!-- FILTERS -->
 <div class="filters">
   <select id="mainDealer"></select>
   <select id="subDealer"></select>
@@ -198,6 +205,8 @@ th {
 </table>
 </div>
 
+</div>
+
 <script>
 google.charts.load('current', {'packages':['corechart']});
 
@@ -212,29 +221,21 @@ async function fetchData() {
   const text = await response.text();
   const json = JSON.parse(text.substring(47).slice(0, -2));
 
-  rawData = json.table.rows.map(r => ({
-    mainDealer: r.c[0]?.v || "",
-    subDealer: r.c[1]?.v || "",
-    location: r.c[2]?.v || "",
-    type: r.c[3]?.v || "",
-    category: r.c[4]?.v || "",
-    sellout: Number(r.c[5]?.v || 0),
-    display: Number(r.c[6]?.v || 0),
-    gap: Number(r.c[7]?.v || 0)
-  }));
+  rawData = json.table.rows
+    .filter(r => r.c && r.c.length >= 8)
+    .map(r => ({
+      mainDealer: r.c[0]?.v || "",
+      subDealer: r.c[1]?.v || "",
+      location: r.c[2]?.v || "",
+      type: r.c[3]?.v || "",
+      category: r.c[4]?.v || "",
+      sellout: Number(r.c[5]?.v || 0),
+      display: Number(r.c[6]?.v || 0),
+      gap: Number(r.c[7]?.v || 0)
+    }));
 
   populateFilters();
   filterData();
-}
-
-function populateFilters() {
-  fillSelect("mainDealer", unique("mainDealer"));
-  fillSelect("locationFilter", unique("location"));
-  fillSelect("typeFilter", unique("type"));
-  fillSelect("categoryFilter", unique("category"));
-  document.querySelectorAll("select").forEach(s => {
-    s.addEventListener("change", filterData);
-  });
 }
 
 function unique(key) {
@@ -246,6 +247,16 @@ function fillSelect(id, values) {
   select.innerHTML = `<option value="">All ${id}</option>`;
   values.forEach(v => {
     select.innerHTML += `<option value="${v}">${v}</option>`;
+  });
+}
+
+function populateFilters() {
+  fillSelect("mainDealer", unique("mainDealer"));
+  fillSelect("locationFilter", unique("location"));
+  fillSelect("typeFilter", unique("type"));
+  fillSelect("categoryFilter", unique("category"));
+  document.querySelectorAll("select").forEach(s => {
+    s.addEventListener("change", filterData);
   });
 }
 
@@ -269,31 +280,23 @@ function filterData() {
   if(status==="zeroSell") filtered = filtered.filter(d=>d.sellout===0);
   if(status==="zeroDisplay") filtered = filtered.filter(d=>d.display===0);
 
-  updateSubDealer(main);
   updateKPIs(filtered);
   drawCharts(filtered);
   drawTable(filtered);
 }
 
-function updateSubDealer(main) {
-  let list = rawData
-    .filter(d => !main || d.mainDealer === main)
-    .map(d => d.subDealer);
-  fillSelect("subDealer", [...new Set(list)]);
-}
-
 function updateKPIs(data){
-  const totalSell=data.reduce((a,b)=>a+b.sellout,0);
-  const totalDisp=data.reduce((a,b)=>a+b.display,0);
-  const totalGap=data.reduce((a,b)=>a+b.gap,0);
-  const efficiency=totalDisp===0?0:((totalSell/totalDisp)*100).toFixed(1);
-  const problems=data.filter(d=>d.sellout<d.display).length;
+  const totalSell = data.reduce((a,b)=>a+b.sellout,0);
+  const totalDisp = data.reduce((a,b)=>a+b.display,0);
+  const totalGap = data.reduce((a,b)=>a+b.gap,0);
+  const efficiency = totalDisp===0?0:((totalSell/totalDisp)*100).toFixed(1);
+  const problems = data.filter(d=>d.sellout<d.display).length;
 
-  document.getElementById("totalSell").innerText=totalSell;
-  document.getElementById("totalDisplay").innerText=totalDisp;
-  document.getElementById("totalGap").innerText=totalGap;
-  document.getElementById("efficiency").innerText=efficiency+"%";
-  document.getElementById("problemCount").innerText=problems;
+  document.getElementById("totalSell").innerText = totalSell;
+  document.getElementById("totalDisplay").innerText = totalDisp;
+  document.getElementById("totalGap").innerText = totalGap;
+  document.getElementById("efficiency").innerText = efficiency+"%";
+  document.getElementById("problemCount").innerText = problems;
 }
 
 function drawCharts(data){
