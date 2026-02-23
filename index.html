@@ -12,7 +12,6 @@ body {
   background: #f4f6fa;
 }
 
-/* MAIN CONTAINER */
 .container {
   max-width: 1200px;
   margin: auto;
@@ -33,16 +32,15 @@ body {
 .header h1 {
   margin: 0;
   font-size: 28px;
-  font-weight: 700;
 }
 
 .header p {
-  margin-top: 8px;
+  margin-top: 6px;
   font-size: 14px;
   opacity: 0.9;
 }
 
-/* KPI GRID FIXED */
+/* KPI GRID */
 .kpi-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -89,14 +87,26 @@ body {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-  margin-bottom: 25px;
+  margin-bottom: 20px;
+  align-items: center;
 }
 
-select {
+select, button {
   padding: 8px;
   border-radius: 6px;
   border: 1px solid #ccc;
   min-width: 150px;
+}
+
+button {
+  background: #2a5298;
+  color: white;
+  cursor: pointer;
+  border: none;
+}
+
+button:hover {
+  background: #1e3c72;
 }
 
 /* Cards */
@@ -178,14 +188,11 @@ th {
     <option value="zeroSell">Zero Sellout</option>
     <option value="zeroDisplay">Zero Display</option>
   </select>
+  <button onclick="refreshData()">🔄 Refresh Data</button>
 </div>
 
 <div class="card">
   <div id="piechart" style="height:400px;"></div>
-</div>
-
-<div class="card">
-  <div id="columnchart" style="height:400px;"></div>
 </div>
 
 <div class="card">
@@ -216,13 +223,13 @@ const SHEET_NAME = "FLAT_DATA";
 let rawData = [];
 
 async function fetchData() {
-  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${SHEET_NAME}`;
+  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${SHEET_NAME}&_=${new Date().getTime()}`;
   const response = await fetch(url);
   const text = await response.text();
   const json = JSON.parse(text.substring(47).slice(0, -2));
 
   rawData = json.table.rows
-    .filter(r => r.c && r.c.length >= 8)
+    .filter(r => r.c && r.c[0] && r.c[0].v)
     .map(r => ({
       mainDealer: r.c[0]?.v || "",
       subDealer: r.c[1]?.v || "",
@@ -238,8 +245,22 @@ async function fetchData() {
   filterData();
 }
 
-function unique(key) {
-  return [...new Set(rawData.map(d => d[key]))].filter(v => v);
+function refreshData() {
+  fetchData();
+}
+
+function populateFilters() {
+  fillSelect("mainDealer", unique("mainDealer"));
+  fillSelect("typeFilter", unique("type"));
+  fillSelect("categoryFilter", unique("category"));
+}
+
+function unique(key, filterMain=null) {
+  let data = rawData;
+  if(filterMain){
+    data = rawData.filter(d=>d.mainDealer===filterMain);
+  }
+  return [...new Set(data.map(d => d[key]).filter(v=>v))];
 }
 
 function fillSelect(id, values) {
@@ -250,18 +271,16 @@ function fillSelect(id, values) {
   });
 }
 
-function populateFilters() {
-  fillSelect("mainDealer", unique("mainDealer"));
-  fillSelect("locationFilter", unique("location"));
-  fillSelect("typeFilter", unique("type"));
-  fillSelect("categoryFilter", unique("category"));
-  document.querySelectorAll("select").forEach(s => {
-    s.addEventListener("change", filterData);
-  });
-}
+document.querySelectorAll("select").forEach(s => {
+  s.addEventListener("change", filterData);
+});
 
 function filterData() {
   const main = mainDealer.value;
+
+  fillSelect("subDealer", unique("subDealer", main));
+  fillSelect("locationFilter", unique("location", main));
+
   const sub = subDealer.value;
   const location = locationFilter.value;
   const type = typeFilter.value;
@@ -281,25 +300,28 @@ function filterData() {
   if(status==="zeroDisplay") filtered = filtered.filter(d=>d.display===0);
 
   updateKPIs(filtered);
-  drawCharts(filtered);
+  drawPie(filtered);
   drawTable(filtered);
 }
 
 function updateKPIs(data){
-  const totalSell = data.reduce((a,b)=>a+b.sellout,0);
-  const totalDisp = data.reduce((a,b)=>a+b.display,0);
-  const totalGap = data.reduce((a,b)=>a+b.gap,0);
-  const efficiency = totalDisp===0?0:((totalSell/totalDisp)*100).toFixed(1);
-  const problems = data.filter(d=>d.sellout<d.display).length;
+  const totalSell=data.reduce((a,b)=>a+b.sellout,0);
+  const totalDisp=data.reduce((a,b)=>a+b.display,0);
+  const totalGap=data.reduce((a,b)=>a+b.gap,0);
+  const efficiency=totalDisp===0?0:((totalSell/totalDisp)*100).toFixed(1);
+  const problems=data.filter(d=>d.sellout<d.display).length;
 
-  document.getElementById("totalSell").innerText = totalSell;
-  document.getElementById("totalDisplay").innerText = totalDisp;
-  document.getElementById("totalGap").innerText = totalGap;
-  document.getElementById("efficiency").innerText = efficiency+"%";
-  document.getElementById("problemCount").innerText = problems;
+  totalSellEl.innerText=totalSell;
+  totalDisplay.innerText=totalDisp;
+  totalGap.innerText=totalGap;
+  efficiencyEl.innerText=efficiency+"%";
+  problemCount.innerText=problems;
 }
 
-function drawCharts(data){
+const totalSellEl=document.getElementById("totalSell");
+const efficiencyEl=document.getElementById("efficiency");
+
+function drawPie(data){
   google.charts.setOnLoadCallback(()=>{
     const totalSell=data.reduce((a,b)=>a+b.sellout,0);
     const totalDisp=data.reduce((a,b)=>a+b.display,0);
