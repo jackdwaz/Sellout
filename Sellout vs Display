@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dealer Performance Dashboard</title>
+<script src="https://www.gstatic.com/charts/loader.js"></script>
+
+<style>
+body {
+font-family: Arial;
+margin: 15px;
+background:#f4f6f9;
+}
+
+h2 {
+text-align:center;
+}
+
+/* KPI Cards */
+.kpi-container {
+display:flex;
+flex-wrap:wrap;
+gap:15px;
+margin-bottom:20px;
+}
+
+.kpi {
+flex:1;
+min-width:180px;
+background:white;
+padding:15px;
+border-radius:8px;
+box-shadow:0 2px 5px rgba(0,0,0,0.1);
+text-align:center;
+}
+
+.kpi h3 {
+margin:5px 0;
+font-size:18px;
+}
+
+.kpi span {
+font-size:22px;
+font-weight:bold;
+}
+
+.filters {
+display:flex;
+flex-wrap:wrap;
+gap:10px;
+margin-bottom:20px;
+}
+
+select {
+padding:8px;
+flex:1;
+min-width:150px;
+}
+
+.card {
+background:white;
+padding:15px;
+margin-bottom:20px;
+border-radius:8px;
+box-shadow:0 2px 5px rgba(0,0,0,0.1);
+}
+
+.red { background:#ffd6d6; }
+.green { background:#d6ffd9; }
+
+table {
+width:100%;
+border-collapse:collapse;
+font-size:14px;
+}
+
+th, td {
+border:1px solid #ddd;
+padding:6px;
+text-align:center;
+}
+
+th { background:#f0f0f0; }
+</style>
+</head>
+
+<body>
+
+<h2>Dealer Performance Dashboard</h2>
+
+<!-- KPI CARDS -->
+<div class="kpi-container">
+<div class="kpi">
+<h3>Total Sellout</h3>
+<span id="totalSell">0</span>
+</div>
+<div class="kpi">
+<h3>Total Display</h3>
+<span id="totalDisplay">0</span>
+</div>
+<div class="kpi">
+<h3>Total Gap</h3>
+<span id="totalGap">0</span>
+</div>
+<div class="kpi">
+<h3>Sell Efficiency %</h3>
+<span id="efficiency">0%</span>
+</div>
+<div class="kpi">
+<h3>Problem Cases</h3>
+<span id="problemCount">0</span>
+</div>
+</div>
+
+<!-- FILTERS -->
+<div class="filters">
+<select id="mainDealer"></select>
+<select id="subDealer"></select>
+<select id="typeFilter"></select>
+<select id="categoryFilter"></select>
+</div>
+
+<div class="card">
+<div id="piechart" style="height:400px;"></div>
+</div>
+
+<div class="card">
+<div id="columnchart" style="height:400px;"></div>
+</div>
+
+<div class="card">
+<table>
+<thead>
+<tr>
+<th>Sub Dealer</th>
+<th>Type</th>
+<th>Category</th>
+<th>Sellout</th>
+<th>Display</th>
+<th>Gap</th>
+</tr>
+</thead>
+<tbody id="tableBody"></tbody>
+</table>
+</div>
+
+<script>
+google.charts.load('current', {'packages':['corechart']});
+
+const SHEET_ID = "1BKxJ9f7ZryTNx0UxpQdzWJK22ZyIo4UA_p7yRe0K7t4";
+const SHEET_NAME = "FLAT_DATA";
+
+let rawData = [];
+
+async function fetchData() {
+const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${SHEET_NAME}`;
+const response = await fetch(url);
+const text = await response.text();
+const json = JSON.parse(text.substring(47).slice(0, -2));
+
+rawData = json.table.rows.map(r => ({
+mainDealer: r.c[0]?.v || "",
+subDealer: r.c[1]?.v || "",
+type: r.c[2]?.v || "",
+category: r.c[3]?.v || "",
+sellout: Number(r.c[4]?.v || 0),
+display: Number(r.c[5]?.v || 0),
+gap: Number(r.c[6]?.v || 0)
+}));
+
+populateFilters();
+filterData();
+}
+
+function populateFilters() {
+fillSelect("mainDealer", unique("mainDealer"));
+fillSelect("typeFilter", unique("type"));
+fillSelect("categoryFilter", unique("category"));
+
+document.querySelectorAll("select").forEach(s => {
+s.addEventListener("change", filterData);
+});
+}
+
+function unique(key) {
+return [...new Set(rawData.map(d => d[key]))].filter(v => v);
+}
+
+function fillSelect(id, values) {
+const select = document.getElementById(id);
+select.innerHTML = `<option value="">All ${id}</option>`;
+values.forEach(v => {
+select.innerHTML += `<option value="${v}">${v}</option>`;
+});
+}
+
+function filterData() {
+const main = document.getElementById("mainDealer").value;
+const sub = document.getElementById("subDealer").value;
+const type = document.getElementById("typeFilter").value;
+const cat = document.getElementById("categoryFilter").value;
+
+let filtered = rawData.filter(d =>
+(!main || d.mainDealer === main) &&
+(!sub || d.subDealer === sub) &&
+(!type || d.type === type) &&
+(!cat || d.category === cat)
+);
+
+updateSubDealer(main);
+updateKPIs(filtered);
+drawCharts(filtered);
+drawTable(filtered);
+}
+
+function updateSubDealer(main) {
+let list = rawData
+.filter(d => !main || d.mainDealer === main)
+.map(d => d.subDealer);
+fillSelect("subDealer", [...new Set(list)]);
+}
+
+function updateKPIs(data) {
+const totalSell = data.reduce((a,b)=>a+b.sellout,0);
+const totalDisp = data.reduce((a,b)=>a+b.display,0);
+const totalGap = data.reduce((a,b)=>a+b.gap,0);
+const efficiency = totalDisp === 0 ? 0 : ((totalSell/totalDisp)*100).toFixed(1);
+const problems = data.filter(d => d.sellout < d.display).length;
+
+document.getElementById("totalSell").innerText = totalSell;
+document.getElementById("totalDisplay").innerText = totalDisp;
+document.getElementById("totalGap").innerText = totalGap;
+document.getElementById("efficiency").innerText = efficiency + "%";
+document.getElementById("problemCount").innerText = problems;
+}
+
+function drawCharts(data) {
+google.charts.setOnLoadCallback(() => {
+
+const totalSell = data.reduce((a,b)=>a+b.sellout,0);
+const totalDisp = data.reduce((a,b)=>a+b.display,0);
+
+const pieData = google.visualization.arrayToDataTable([
+['Metric','Value'],
+['Sellout', totalSell],
+['Display', totalDisp]
+]);
+
+new google.visualization.PieChart(
+document.getElementById('piechart')
+).draw(pieData, {title:'Sellout vs Display'});
+
+const grouped = {};
+data.forEach(d=>{
+if(!grouped[d.category]) grouped[d.category]={sell:0,disp:0};
+grouped[d.category].sell += d.sellout;
+grouped[d.category].disp += d.display;
+});
+
+const colArr = [['Category','Sellout','Display']];
+for(let key in grouped){
+colArr.push([key, grouped[key].sell, grouped[key].disp]);
+}
+
+new google.visualization.ColumnChart(
+document.getElementById('columnchart')
+).draw(
+google.visualization.arrayToDataTable(colArr),
+{title:'Category Comparison'}
+);
+});
+}
+
+function drawTable(data){
+const body = document.getElementById("tableBody");
+body.innerHTML="";
+
+data.forEach(d=>{
+const row=document.createElement("tr");
+
+row.innerHTML=`
+<td>${d.subDealer}</td>
+<td>${d.type}</td>
+<td>${d.category}</td>
+<td class="${d.sellout>d.display?'green':'red'}">${d.sellout}</td>
+<td class="${d.display==0?'red':''}">${d.display}</td>
+<td class="${d.gap<0?'red':''}">${d.gap}</td>
+`;
+body.appendChild(row);
+});
+}
+
+fetchData();
+</script>
+
+</body>
+</html>
