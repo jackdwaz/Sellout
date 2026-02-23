@@ -18,6 +18,7 @@ body {
   padding: 20px;
 }
 
+/* HEADER */
 .header {
   background: linear-gradient(135deg, #1e3c72, #2a5298);
   padding: 25px;
@@ -30,6 +31,7 @@ body {
 
 .header h1 { margin: 0; font-size: 28px; }
 
+/* KPI GRID */
 .kpi-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -85,6 +87,8 @@ button {
   border: none;
   cursor: pointer;
 }
+
+button:hover { background: #1e3c72; }
 
 .card {
   background: white;
@@ -210,40 +214,37 @@ async function fetchData() {
       gap: Number(r.c[7]?.v || 0)
     }));
 
-  populateFilters();
-  filterData();
+  initializeFilters();
+  applyFilters();
 }
 
-function refreshData() { fetchData(); }
+function refreshData(){ fetchData(); }
 
-function unique(key, main=null){
-  let data = rawData;
-  if(main) data = rawData.filter(d=>d.mainDealer===main);
+function unique(key, data){
   return [...new Set(data.map(d=>d[key]).filter(v=>v))];
 }
 
 function fillSelect(id, values){
   const select=document.getElementById(id);
+  const currentValue = select.value;
   select.innerHTML=`<option value="">All ${id}</option>`;
   values.forEach(v=>select.innerHTML+=`<option value="${v}">${v}</option>`);
+  select.value = values.includes(currentValue) ? currentValue : "";
 }
 
-function populateFilters(){
-  fillSelect("mainDealer", unique("mainDealer"));
-  fillSelect("typeFilter", unique("type"));
-  fillSelect("categoryFilter", unique("category"));
+function initializeFilters(){
+  fillSelect("mainDealer", unique("mainDealer", rawData));
+  fillSelect("typeFilter", unique("type", rawData));
+  fillSelect("categoryFilter", unique("category", rawData));
 }
 
 document.querySelectorAll("select").forEach(s=>{
-  s.addEventListener("change", filterData);
+  s.addEventListener("change", applyFilters);
 });
 
-function filterData(){
+function applyFilters(){
+
   const main=mainDealer.value;
-
-  fillSelect("subDealer", unique("subDealer",main));
-  fillSelect("locationFilter", unique("location",main));
-
   const sub=subDealer.value;
   const location=locationFilter.value;
   const type=typeFilter.value;
@@ -258,6 +259,10 @@ function filterData(){
     (!cat||d.category===cat)
   );
 
+  // Update cascading filters
+  fillSelect("subDealer", unique("subDealer", rawData.filter(d=>!main||d.mainDealer===main)));
+  fillSelect("locationFilter", unique("location", rawData.filter(d=>!main||d.mainDealer===main)));
+
   if(status==="problem") filtered=filtered.filter(d=>d.sellout<d.display);
   if(status==="zeroSell") filtered=filtered.filter(d=>d.sellout===0);
   if(status==="zeroDisplay") filtered=filtered.filter(d=>d.display===0);
@@ -270,20 +275,22 @@ function filterData(){
 function updateKPIs(data){
   const totalSell=data.reduce((a,b)=>a+b.sellout,0);
   const totalDisp=data.reduce((a,b)=>a+b.display,0);
-
-  const totalGap = totalSell - totalDisp;   // ✅ FIXED
+  const totalGap = totalSell - totalDisp;
   const efficiency = totalDisp===0?0:((totalSell/totalDisp)*100).toFixed(1);
   const problems=data.filter(d=>d.sellout<d.display).length;
 
   totalSellEl.innerText=totalSell;
-  totalDisplay.innerText=totalDisp;
+  totalDisplayEl.innerText=totalDisp;
   totalGapEl.innerText=totalGap;
   efficiencyEl.innerText=efficiency+"%";
   problemCount.innerText=problems;
+
+  // Make Total Gap red if negative
+  totalGapEl.style.color = totalGap < 0 ? "red" : "green";
 }
 
 const totalSellEl=document.getElementById("totalSell");
-const totalDisplay=document.getElementById("totalDisplay");
+const totalDisplayEl=document.getElementById("totalDisplay");
 const totalGapEl=document.getElementById("totalGap");
 const efficiencyEl=document.getElementById("efficiency");
 
