@@ -18,7 +18,6 @@ body {
   padding: 20px;
 }
 
-/* HEADER */
 .header {
   background: linear-gradient(135deg, #1e3c72, #2a5298);
   padding: 25px;
@@ -29,18 +28,8 @@ body {
   box-shadow: 0 6px 18px rgba(0,0,0,0.15);
 }
 
-.header h1 {
-  margin: 0;
-  font-size: 28px;
-}
+.header h1 { margin: 0; font-size: 28px; }
 
-.header p {
-  margin-top: 6px;
-  font-size: 14px;
-  opacity: 0.9;
-}
-
-/* KPI GRID */
 .kpi-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -56,11 +45,7 @@ body {
   text-align: center;
 }
 
-.kpi-card h4 {
-  margin: 0;
-  color: #666;
-  font-size: 15px;
-}
+.kpi-card h4 { margin: 0; color: #666; }
 
 .kpi-card span {
   display: block;
@@ -69,7 +54,6 @@ body {
   font-weight: bold;
 }
 
-/* Wide Problem Card */
 .problem-card {
   background: linear-gradient(135deg, #ff6b6b, #ff4d4d);
   color: white;
@@ -79,16 +63,13 @@ body {
   font-size: 20px;
   font-weight: bold;
   margin-bottom: 25px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
 }
 
-/* Filters */
 .filters {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
   margin-bottom: 20px;
-  align-items: center;
 }
 
 select, button {
@@ -101,15 +82,10 @@ select, button {
 button {
   background: #2a5298;
   color: white;
-  cursor: pointer;
   border: none;
+  cursor: pointer;
 }
 
-button:hover {
-  background: #1e3c72;
-}
-
-/* Cards */
 .card {
   background: white;
   padding: 15px;
@@ -118,21 +94,15 @@ button:hover {
   margin-bottom: 25px;
 }
 
-/* Table */
 table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 14px;
 }
 
 th, td {
   padding: 8px;
   border: 1px solid #eee;
   text-align: center;
-}
-
-th {
-  background: #fafafa;
 }
 
 .red { background:#ffd6d6; }
@@ -150,7 +120,6 @@ th {
 
 <div class="header">
   <h1>Sellout vs Display Dashboard</h1>
-  <p>Dealer Performance & Stock Health Monitor</p>
 </div>
 
 <div class="kpi-grid">
@@ -188,7 +157,7 @@ th {
     <option value="zeroSell">Zero Sellout</option>
     <option value="zeroDisplay">Zero Display</option>
   </select>
-  <button onclick="refreshData()">🔄 Refresh Data</button>
+  <button onclick="refreshData()">🔄 Refresh</button>
 </div>
 
 <div class="card">
@@ -245,59 +214,53 @@ async function fetchData() {
   filterData();
 }
 
-function refreshData() {
-  fetchData();
+function refreshData() { fetchData(); }
+
+function unique(key, main=null){
+  let data = rawData;
+  if(main) data = rawData.filter(d=>d.mainDealer===main);
+  return [...new Set(data.map(d=>d[key]).filter(v=>v))];
 }
 
-function populateFilters() {
+function fillSelect(id, values){
+  const select=document.getElementById(id);
+  select.innerHTML=`<option value="">All ${id}</option>`;
+  values.forEach(v=>select.innerHTML+=`<option value="${v}">${v}</option>`);
+}
+
+function populateFilters(){
   fillSelect("mainDealer", unique("mainDealer"));
   fillSelect("typeFilter", unique("type"));
   fillSelect("categoryFilter", unique("category"));
 }
 
-function unique(key, filterMain=null) {
-  let data = rawData;
-  if(filterMain){
-    data = rawData.filter(d=>d.mainDealer===filterMain);
-  }
-  return [...new Set(data.map(d => d[key]).filter(v=>v))];
-}
-
-function fillSelect(id, values) {
-  const select = document.getElementById(id);
-  select.innerHTML = `<option value="">All ${id}</option>`;
-  values.forEach(v => {
-    select.innerHTML += `<option value="${v}">${v}</option>`;
-  });
-}
-
-document.querySelectorAll("select").forEach(s => {
+document.querySelectorAll("select").forEach(s=>{
   s.addEventListener("change", filterData);
 });
 
-function filterData() {
-  const main = mainDealer.value;
+function filterData(){
+  const main=mainDealer.value;
 
-  fillSelect("subDealer", unique("subDealer", main));
-  fillSelect("locationFilter", unique("location", main));
+  fillSelect("subDealer", unique("subDealer",main));
+  fillSelect("locationFilter", unique("location",main));
 
-  const sub = subDealer.value;
-  const location = locationFilter.value;
-  const type = typeFilter.value;
-  const cat = categoryFilter.value;
-  const status = statusFilter.value;
+  const sub=subDealer.value;
+  const location=locationFilter.value;
+  const type=typeFilter.value;
+  const cat=categoryFilter.value;
+  const status=statusFilter.value;
 
-  let filtered = rawData.filter(d =>
-    (!main || d.mainDealer === main) &&
-    (!sub || d.subDealer === sub) &&
-    (!location || d.location === location) &&
-    (!type || d.type === type) &&
-    (!cat || d.category === cat)
+  let filtered=rawData.filter(d=>
+    (!main||d.mainDealer===main)&&
+    (!sub||d.subDealer===sub)&&
+    (!location||d.location===location)&&
+    (!type||d.type===type)&&
+    (!cat||d.category===cat)
   );
 
-  if(status==="problem") filtered = filtered.filter(d=>d.sellout<d.display);
-  if(status==="zeroSell") filtered = filtered.filter(d=>d.sellout===0);
-  if(status==="zeroDisplay") filtered = filtered.filter(d=>d.display===0);
+  if(status==="problem") filtered=filtered.filter(d=>d.sellout<d.display);
+  if(status==="zeroSell") filtered=filtered.filter(d=>d.sellout===0);
+  if(status==="zeroDisplay") filtered=filtered.filter(d=>d.display===0);
 
   updateKPIs(filtered);
   drawPie(filtered);
@@ -307,18 +270,21 @@ function filterData() {
 function updateKPIs(data){
   const totalSell=data.reduce((a,b)=>a+b.sellout,0);
   const totalDisp=data.reduce((a,b)=>a+b.display,0);
-  const totalGap=data.reduce((a,b)=>a+b.gap,0);
-  const efficiency=totalDisp===0?0:((totalSell/totalDisp)*100).toFixed(1);
+
+  const totalGap = totalSell - totalDisp;   // ✅ FIXED
+  const efficiency = totalDisp===0?0:((totalSell/totalDisp)*100).toFixed(1);
   const problems=data.filter(d=>d.sellout<d.display).length;
 
   totalSellEl.innerText=totalSell;
   totalDisplay.innerText=totalDisp;
-  totalGap.innerText=totalGap;
+  totalGapEl.innerText=totalGap;
   efficiencyEl.innerText=efficiency+"%";
   problemCount.innerText=problems;
 }
 
 const totalSellEl=document.getElementById("totalSell");
+const totalDisplay=document.getElementById("totalDisplay");
+const totalGapEl=document.getElementById("totalGap");
 const efficiencyEl=document.getElementById("efficiency");
 
 function drawPie(data){
