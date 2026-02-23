@@ -5,7 +5,6 @@
 <title>Sellout vs Display Dashboard</title>
 <script src="https://www.gstatic.com/charts/loader.js"></script>
 
-
 <style>
 body {
   font-family: 'Segoe UI', Arial;
@@ -29,7 +28,6 @@ body {
   margin: 0;
   font-size: 28px;
   font-weight: 700;
-  letter-spacing: 1px;
 }
 
 .header p {
@@ -56,7 +54,6 @@ body {
 
 .kpi-card h4 {
   margin: 0;
-  font-weight: 500;
   color: #555;
 }
 
@@ -92,10 +89,10 @@ select {
   padding: 8px;
   border-radius: 6px;
   border: 1px solid #ccc;
-  min-width: 160px;
+  min-width: 150px;
 }
 
-/* Chart Card */
+/* Cards */
 .card {
   background: white;
   padding: 15px;
@@ -125,9 +122,7 @@ th {
 .green { background:#d6ffd9; }
 
 @media(max-width:768px){
-  .kpi-grid {
-    grid-template-columns: 1fr;
-  }
+  .kpi-grid { grid-template-columns: 1fr; }
 }
 </style>
 </head>
@@ -167,6 +162,7 @@ th {
 <div class="filters">
   <select id="mainDealer"></select>
   <select id="subDealer"></select>
+  <select id="locationFilter"></select>
   <select id="typeFilter"></select>
   <select id="categoryFilter"></select>
   <select id="statusFilter">
@@ -190,6 +186,7 @@ th {
 <thead>
 <tr>
 <th>Sub Dealer</th>
+<th>Location</th>
 <th>Type</th>
 <th>Category</th>
 <th>Sellout</th>
@@ -218,11 +215,12 @@ async function fetchData() {
   rawData = json.table.rows.map(r => ({
     mainDealer: r.c[0]?.v || "",
     subDealer: r.c[1]?.v || "",
-    type: r.c[2]?.v || "",
-    category: r.c[3]?.v || "",
-    sellout: Number(r.c[4]?.v || 0),
-    display: Number(r.c[5]?.v || 0),
-    gap: Number(r.c[6]?.v || 0)
+    location: r.c[2]?.v || "",
+    type: r.c[3]?.v || "",
+    category: r.c[4]?.v || "",
+    sellout: Number(r.c[5]?.v || 0),
+    display: Number(r.c[6]?.v || 0),
+    gap: Number(r.c[7]?.v || 0)
   }));
 
   populateFilters();
@@ -231,6 +229,7 @@ async function fetchData() {
 
 function populateFilters() {
   fillSelect("mainDealer", unique("mainDealer"));
+  fillSelect("locationFilter", unique("location"));
   fillSelect("typeFilter", unique("type"));
   fillSelect("categoryFilter", unique("category"));
   document.querySelectorAll("select").forEach(s => {
@@ -253,6 +252,7 @@ function fillSelect(id, values) {
 function filterData() {
   const main = mainDealer.value;
   const sub = subDealer.value;
+  const location = locationFilter.value;
   const type = typeFilter.value;
   const cat = categoryFilter.value;
   const status = statusFilter.value;
@@ -260,6 +260,7 @@ function filterData() {
   let filtered = rawData.filter(d =>
     (!main || d.mainDealer === main) &&
     (!sub || d.subDealer === sub) &&
+    (!location || d.location === location) &&
     (!type || d.type === type) &&
     (!cat || d.category === cat)
   );
@@ -308,22 +309,6 @@ function drawCharts(data){
 
     new google.visualization.PieChart(document.getElementById("piechart"))
       .draw(pieData,{title:'Sellout vs Display'});
-
-    const grouped={};
-    data.forEach(d=>{
-      if(!grouped[d.category]) grouped[d.category]={sell:0,disp:0};
-      grouped[d.category].sell+=d.sellout;
-      grouped[d.category].disp+=d.display;
-    });
-
-    const colArr=[['Category','Sellout','Display']];
-    for(let key in grouped){
-      colArr.push([key,grouped[key].sell,grouped[key].disp]);
-    }
-
-    new google.visualization.ColumnChart(document.getElementById("columnchart"))
-      .draw(google.visualization.arrayToDataTable(colArr),
-      {title:'Category Comparison'});
   });
 }
 
@@ -334,6 +319,7 @@ function drawTable(data){
     body.innerHTML+=`
     <tr>
       <td>${d.subDealer}</td>
+      <td>${d.location}</td>
       <td>${d.type}</td>
       <td>${d.category}</td>
       <td class="${d.sellout>d.display?'green':'red'}">${d.sellout}</td>
