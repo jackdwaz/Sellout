@@ -160,6 +160,7 @@ th, td {
     <option value="problem">Problem Cases</option>
     <option value="zeroSell">Zero Sellout</option>
     <option value="zeroDisplay">Zero Display</option>
+    <option value="allDisplay">All Display</option>
   </select>
   <button onclick="refreshData()">🔄 Refresh</button>
 </div>
@@ -266,7 +267,8 @@ function applyFilters(){
   if(status==="problem") filtered=filtered.filter(d=>d.sellout<d.display);
   if(status==="zeroSell") filtered=filtered.filter(d=>d.sellout===0);
   if(status==="zeroDisplay") filtered=filtered.filter(d=>d.display===0);
-
+  if(status==="allDisplay") filtered=filtered.filter(d=>d.display>0);
+  
   updateKPIs(filtered);
   drawPie(filtered);
   drawTable(filtered);
